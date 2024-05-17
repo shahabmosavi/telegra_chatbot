@@ -1,0 +1,123 @@
+# FAL-E HAFEZ Telegram Chatbot
+
+This Telegram chatbot provides users with FAL-E HAFEZ, a traditional form of fortune-telling using the poems of Hafez. The bot is built using Python and the `python-telegram-bot` library.
+
+## Features
+
+- Responds to the `/start` command with a welcome message.
+- Provides options for getting a fortune with "فال حافظ" or seeking help with "کمک".
+- Fetches a random poem from an external API and displays its meaning.
+
+## Prerequisites
+
+- Python 3.6+
+- A Telegram bot token from [BotFather](https://core.telegram.org/bots#botfather)
+- Access to the Hafez API with a valid token
+
+## Installation
+
+1. Clone this repository:
+
+    ```sh
+    git clone https://github.com/yourusername/fal-e-hafez-bot.git
+    cd fal-e-hafez-bot
+    ```
+
+2. Create a virtual environment and activate it:
+
+    ```sh
+    python3 -m venv venv
+    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+    ```
+
+3. Install the required packages:
+
+    ```sh
+    pip install -r requirements.txt
+    ```
+
+4. Create a file named `config.py` in the project directory and add your Telegram bot token and Hafez API token:
+
+    ```python
+    BOT_TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN'
+    API_TOKEN = 'YOUR_HAFEZ_API_TOKEN'
+    ```
+
+## Usage
+
+1. Run the bot:
+
+    ```sh
+    python bot.py
+    ```
+
+2. Open Telegram and search for your bot. Start a conversation and use the `/start` command to interact with the bot.
+
+## Project Structure
+
+- `bot.py`: The main script to run the bot.
+- `config.py`: Configuration file to store your bot and API tokens.
+- `requirements.txt`: List of dependencies.
+
+## bot.py
+
+Here's the `bot.py` script:
+
+```python
+import requests
+from telegram.ext import Updater, CallbackContext, CommandHandler, Filters, MessageHandler
+from telegram import Update, ReplyKeyboardMarkup
+from config import BOT_TOKEN, API_TOKEN
+
+current_order = ''
+about_text = 'در این ربات میتونی با زدن کلید فال حافظ فالت رو بگیری'
+updater = Updater(token=BOT_TOKEN, use_context=True)
+dispatcher = updater.dispatcher
+keyboard_options = [['کمک'], ["فال حافظ"]]
+
+def start(update: Update, context: CallbackContext):
+    global current_order
+    current_order = ''
+    update.message.reply_text('سلام به ربات فال حافظ خوش اومدید 🙋‍♀️\n لطفا یکی از گزینه های زیر را انتخاب کنید',
+                              reply_markup=ReplyKeyboardMarkup(keyboard_options))
+
+def parse_input(update: Update, context: CallbackContext):
+    global current_order
+    message = update.message["text"]
+    if current_order == '':
+        if message == 'کمک':
+            update.message.reply_text(about_text)
+        elif message == 'فال حافظ':
+            current_order = 'فال حافظ'
+            fal_options = [['فال دوباره'], ["بازگشت"]]
+            update.message.reply_text(get_hafez_fal(),
+                                      reply_markup=ReplyKeyboardMarkup(fal_options))
+        else:
+            update.message.reply_text('سلام لطفا از بین گزینه ها یکی رو انتخاب کنید',
+                                      reply_markup=ReplyKeyboardMarkup(keyboard_options))
+    elif current_order == 'فال حافظ':
+        if message == "فال دوباره":
+            update.message.reply_text(get_hafez_fal())
+        else:
+            current_order = ''
+            update.message.reply_text(' لطفا از بین گزینه ها یکی رو انتخاب کنید',
+                                      reply_markup=ReplyKeyboardMarkup(keyboard_options))
+    else:
+        current_order = ''
+        update.message.reply_text(' لطفا از بین گزینه ها یکی رو انتخاب کنید',
+                                  reply_markup=ReplyKeyboardMarkup(keyboard_options))
+
+def get_hafez_fal():
+    res = requests.get(f'https://one-api.ir/hafez/?token={API_TOKEN}')
+    res = res.json()
+    if res['status'] == 200:
+        return 'شعر : \n' + res['result']['RHYME'] + '\n معنی : \n' + res['result']['MEANING']
+    else:
+        return 'مشکلی پیش آمد لطفا بعدا تست کنید'
+
+input_handler = MessageHandler(Filters.text, parse_input)
+start_handler = CommandHandler('start', start)
+dispatcher.add_handler(start_handler)
+dispatcher.add_handler(input_handler)
+
+updater.start_polling()
